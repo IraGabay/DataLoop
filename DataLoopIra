@@ -1,0 +1,88 @@
+import json
+import re
+import os.path
+from os import path
+import dtlpy as dl
+
+# I am using here the UI login for convenience, this line can be commented out after first run for the next 24 hours
+dl.login()
+
+
+def test_upload_download(projectID):
+
+    # Get the dataset list from the project
+    project = dl.projects.get(project_id=projectID)
+    datasets = project.datasets.list()
+
+    # Extract the dataset ID from the list
+    # This part takes the first dataset that exists in the project list
+    # (it's not an elegant solution, but this is the way I could do it)
+    datatset_str = str(datasets[1])
+    x = datatset_str.split(",")
+    y = x[0].split("=")
+    dataset_ID = y[1].replace("\'", "")
+
+    # Upload a new image as an item to the dataset - just a sample image from the internet
+    dataset = project.datasets.get(dataset_id=dataset_ID)
+    item_test = dataset.items.upload(
+        local_path='https://media.istockphoto.com/id/684062636/photo/hand-writing-inscription-free-sample-with-marker-concept.jpg?s=1024x1024&w=is&k=20&c=tlEa04cTZEPrTkqm1-AOUeWIYR8TvUPI74X1UPABDu4=')
+
+    # Extract the item ID from the item object
+    # Again, not an elegant solution
+    item_test_json = item_test.to_json()
+    item_test_str = str(item_test_json)
+    x = item_test_str.split(",")
+    y = x[-9].split("=")
+    z = y[0].split(":")
+    a = z[1].replace("\'", "")
+    item_id = a.replace(" ", "")
+
+    # Get the item object according to the ID
+    # This will give us exactly the item that we have uploaded before
+    item = dataset.items.get(item_id=item_id)
+
+    # Download the annotations for the item to a local folder in JSON format
+    downloaded = item.annotations.download(filepath='/Users/iragabay/Desktop/',
+                                           annotation_format=dl.ViewAnnotationOptions.JSON)
+
+    # Check that the downloaded file exists in the defined path
+    result = path.exists("/Users/iragabay/Desktop/hand-writing-inscription-free-sample-with-marker-concept.json")
+
+    # Remove the file in order to clean up the env for the next tests
+    os.remove("/Users/iragabay/Desktop/hand-writing-inscription-free-sample-with-marker-concept.json")
+
+    # Print the test results
+    if result:
+        print("Download passed")
+    else:
+        print("Download failed")
+
+    # Upload pre-defined annotations json file for the same item
+    # The file contains a defined label "ira_label"
+    uploaded = item.annotations.upload(annotations='/Users/iragabay/Desktop/ann.json')
+
+   # Check that the uploaded object is not empty, just to see that the action was successful
+    uploaded_json = uploaded.to_json()
+    result = bool(uploaded_json)
+    if result:
+        print("Upload action succeeded")
+    else:
+        print("Upload action failed")
+
+    # Download the annotations file again in order to check if the label that was uploaded exists in the file
+    downloaded_predefined = item.annotations.download(filepath='/Users/iragabay/Desktop/',
+                                                      annotation_format=dl.ViewAnnotationOptions.JSON)
+    # Convert the downloaded file object to string
+    down_file = open(downloaded)
+    down_content = json.load(down_file)
+    down_file.close()
+    down_file_str = str(down_content)
+
+    # Check if the predefined label exists in the item annotations
+    if "ira_label" in down_file_str:
+        print("Upload label verification Passed")
+    else:
+        print("Upload label verification Failed")
+
+
+test_upload_download('b01805dc-aa7b-4b6a-8946-2608f948690f')
